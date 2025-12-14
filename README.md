@@ -46,15 +46,15 @@ Das Script fragt nach:
 XtreamMasters Database User Manager
 ====================================
 
-SSH Host [212.237.231.243]: 212.237.231.243
-SSH User [system_admin]: system_admin
-SSH Password [erundsie]: erundsie
+SSH Host [212.xx.xx.xx]: 212.xx.xx.xx.xx
+SSH User [system_admin]: root
+SSH Password [erundsie]: pass
 
 ============================================================
 SCHRITT 1: Extrahiere Datenbank-Credentials
 ============================================================
 ✓ Credentials gefunden:
-  Host: 117.55.203.215:7999
+  Host: 117.xx.xx.xx:7999
   User: xtream_masters_user_3
   Database: xtreammasters
 
@@ -90,7 +90,7 @@ GRANT ALL PRIVILEGES ON *.* TO `myadmin`@`%` WITH GRANT OPTION
 
 === Teste neue Verbindung ===
 ✓✓✓ VERBINDUNG ERFOLGREICH! ✓✓✓
-Host: 117.55.203.215 via TCP/IP
+Host: 117.xx.xx.xx:7999 via TCP/IP
 Server: 5.5.5-10.6.22-MariaDB-ubu2204
 
 ============================================================
@@ -103,7 +103,7 @@ Password: securepass123
 Host: %
 
 Connection String:
-mysql -h 117.55.203.215 -P 7999 -u myadmin -psecurepass123 xtreammasters
+mysql -h 117.xx.xx.xx:7999 -P 7999 -u myadmin -psecurepass123 xtreammasters
 ```
 
 ## Wie es funktioniert
