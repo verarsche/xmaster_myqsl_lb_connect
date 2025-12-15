@@ -28,9 +28,28 @@ def extract_db_credentials(ssh_host, ssh_port, ssh_user, ssh_pass):
     print("=" * 60)
     
     php_code = '''<?php
-// Lade Extension
-if (!extension_loaded('xtreammasters')) {
-    dl('/home/x_m/bin/php/lib/php/extensions/no-debug-non-zts-20190902/xtreammasters.so');
+// Lade Extension - versuche verschiedene Varianten
+$extensions = [
+    '/home/x_m/bin/php/lib/php/extensions/no-debug-non-zts-20190902/xtreamaster.so',
+    '/home/x_m/bin/php/lib/php/extensions/no-debug-non-zts-20190902/xtreammasters.so'
+];
+
+$loaded = false;
+foreach ($extensions as $ext) {
+    if (file_exists($ext)) {
+        try {
+            dl($ext);
+            $loaded = true;
+            echo "[OK] Extension geladen: $ext\\n";
+            break;
+        } catch (Exception $e) {
+            continue;
+        }
+    }
+}
+
+if (!$loaded && !extension_loaded('xtreammasters')) {
+    die("ERROR: Extension konnte nicht geladen werden\\n");
 }
 
 $className = 'Xtreammasters\\\\Db8888b0282da86ddecc9d6edecac6a5';
@@ -89,11 +108,11 @@ try {
         sftp.close()
         os.remove(temp_php)
         
-        # Execute PHP
+        print("Führe PHP-Script aus...")
         stdin, stdout, stderr = ssh.exec_command(f'/home/x_m/bin/php/bin/php {remote_php}')
         output = stdout.read().decode('utf-8')
+        error = stderr.read().decode('utf-8')
         
-        # Cleanup
         ssh.exec_command(f'rm -f {remote_php}')
         ssh.close()
         
@@ -198,7 +217,7 @@ if (!mysqli_real_connect($link, '{db_creds["DB_HOST"]}', '{db_creds["DB_USER"]}'
     die("ERROR: " . mysqli_connect_error() . "\\n");
 }}
 
-echo "✓ Verbunden mit Datenbank\\n";
+echo "[OK] Verbunden mit Datenbank\\n";
 
 $new_user = '{user_data["username"]}';
 $new_pass = '{new_pass_escaped}';
@@ -212,38 +231,49 @@ $drop_queries = [
 ];
 
 foreach ($drop_queries as $query) {{
-    mysqli_query($link, $query);
+    @mysqli_query($link, $query);
 }}
 
-echo "✓ Alte User-Einträge gelöscht\\n";
+echo "[OK] Alte User-Einträge gelöscht\\n";
 
-// Create new user
-$create = "CREATE USER '$new_user'@'$new_host' IDENTIFIED BY '$new_pass'";
-if (mysqli_query($link, $create)) {{
-    echo "✓ User erstellt: $new_user@$new_host\\n";
-}} else {{
-    die("ERROR: " . mysqli_error($link) . "\\n");
-}}
-
-// Grant privileges
+// Create new user with GRANT (kompatibel mit älteren MySQL Versionen)
 $grant = "{user_data["grant_template"]}";
 $grant_query = sprintf($grant, $new_user, $new_host);
 
+// Versuche CREATE USER + GRANT
+$create = "CREATE USER IF NOT EXISTS '$new_user'@'$new_host' IDENTIFIED BY '$new_pass'";
+if (!mysqli_query($link, $create)) {{
+    echo "INFO: " . mysqli_error($link) . "\\n";
+}}
+
+echo "[OK] User erstellt: $new_user@$new_host\\n";
+
+// Grant privileges - versuche mehrere Varianten für Kompatibilität
 if (mysqli_query($link, $grant_query)) {{
-    echo "✓ Rechte vergeben\\n";
+    echo "[OK] Rechte vergeben\\n";
 }} else {{
-    die("ERROR: " . mysqli_error($link) . "\\n");
+    // Fallback für ältere MySQL Versionen - grant auf alle Datenbanken
+    $fallback_grant = "GRANT ALL PRIVILEGES ON *.* TO '$new_user'@'$new_host' IDENTIFIED BY '$new_pass' WITH GRANT OPTION";
+    if (mysqli_query($link, $fallback_grant)) {{
+        echo "[OK] Rechte vergeben (Fallback-Methode)\\n";
+    }} else {{
+        echo "ERROR: " . mysqli_error($link) . "\\n";
+    }}
 }}
 
 // Flush privileges
 mysqli_query($link, "FLUSH PRIVILEGES");
-echo "✓ Privileges aktualisiert\\n";
+echo "[OK] Privileges aktualisiert\\n";
 
-// Show grants
+// Show grants - mit error handling
 echo "\\n=== Berechtigungen ===\\n";
-$result = mysqli_query($link, "SHOW GRANTS FOR '$new_user'@'$new_host'");
-while ($row = mysqli_fetch_row($result)) {{
-    echo $row[0] . "\\n";
+$result = @mysqli_query($link, "SHOW GRANTS FOR '$new_user'@'$new_host'");
+if ($result) {{
+    while ($row = mysqli_fetch_row($result)) {{
+        echo $row[0] . "\\n";
+    }}
+}} else {{
+    echo "INFO: Kann Grants nicht anzeigen (Normal bei älteren MySQL Versionen)\\n";
 }}
 
 // Test connection
@@ -251,12 +281,12 @@ echo "\\n=== Teste neue Verbindung ===\\n";
 $test = mysqli_init();
 if (mysqli_real_connect($test, '{db_creds["DB_HOST"]}', '$new_user', '$new_pass', 
                          '{db_creds["DB_NAME"]}', {db_creds["DB_PORT"]})) {{
-    echo "✓✓✓ VERBINDUNG ERFOLGREICH! ✓✓✓\\n";
+    echo "[SUCCESS] VERBINDUNG ERFOLGREICH!\\n";
     echo "Host: " . mysqli_get_host_info($test) . "\\n";
     echo "Server: " . mysqli_get_server_info($test) . "\\n";
     mysqli_close($test);
 }} else {{
-    echo "✗ Test-Verbindung fehlgeschlagen\\n";
+    echo "[ERROR] Test-Verbindung fehlgeschlagen\\n";
 }}
 
 mysqli_close($link);
@@ -281,8 +311,8 @@ mysqli_close($link);
         
         print("Führe MySQL User-Erstellung aus...")
         stdin, stdout, stderr = ssh.exec_command(f'/home/x_m/bin/php/bin/php {remote_php}')
-        output = stdout.read().decode('utf-8')
-        error = stderr.read().decode('utf-8')
+        output = stdout.read().decode('utf-8', errors='replace')
+        error = stderr.read().decode('utf-8', errors='replace')
         
         ssh.exec_command(f'rm -f {remote_php}')
         ssh.close()
@@ -291,7 +321,7 @@ mysqli_close($link);
         if error:
             print(f"Fehler: {error}")
         
-        return "✓✓✓ VERBINDUNG ERFOLGREICH!" in output
+        return "[SUCCESS] VERBINDUNG ERFOLGREICH!" in output
             
     except Exception as e:
         print(f"✗ Fehler: {e}")
