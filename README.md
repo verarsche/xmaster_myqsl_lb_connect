@@ -1,68 +1,130 @@
 # XtreamMasters Database User Manager
 
-Automatisches Tool zum Verwalten von MySQL-Usern in XtreamMasters/XUI-Systemen.
+Automatisches Tool zum Extrahieren von Datenbank-Credentials und Erstellen von MySQL-Admin-Usern auf XtreamUI/XtreamCodes Servern.
 
 ## Features
 
-- **Automatische Credential-Extraktion**: Findet DB-Credentials aus der xtreammasters.so Extension
-- **Interaktive User-Erstellung**: Fragt nach Username, Password und Zugriffsrechten
-- **Flexible Berechtigungen**: 
-  - GRANT ALL PRIVILEGES (voller Admin)
-  - Standard-Zugriff (SELECT, INSERT, UPDATE, DELETE)
-  - Read-Only (SELECT only)
-- **Zugriffskontrolle**: Von überall (%), localhost oder spezifische IP
-- **Automatischer Test**: Validiert die neue Verbindung
-
-## Requirements
-
-```bash
-pip install paramiko
-```
+- ✅ Automatische Extraktion der DB-Credentials aus `xtreammasters.so` Extension
+- ✅ Sicheres SSH-Verbindungsmanagement mit Paramiko
+- ✅ Erstellt MySQL-User mit konfigurierbaren Berechtigungen
+- ✅ Passwort-Eingabe ohne Echo (getpass)
+- ✅ Kommandozeilen-Parameter oder interaktive Eingabe
+- ✅ Automatische Verbindungstests
 
 ## Installation
 
+### Voraussetzungen
+
 ```bash
-git clone <dein-repo>
-cd <dein-repo>
 pip install paramiko
 ```
 
-## Usage
+## Verwendung
+
+### Option 1: Mit Kommandozeilen-Parametern
+
+```bash
+python xtreamdb_user_manager.py <SSH_HOST> <SSH_PORT> <SSH_PASSWORD>
+```
+
+**Beispiel:**
+```bash
+python xtreamdb_user_manager.py 89.105.194.222 22 xKHcjijwWkfsKy
+```
+
+### Option 2: Interaktiv
 
 ```bash
 python xtreamdb_user_manager.py
 ```
 
-Das Script fragt nach:
-1. SSH-Credentials (Server wo XtreamMasters läuft)
-2. Neuer Username
-3. Neues Password
-4. Zugriffs-Level (1-3)
-5. Host-Einschränkung (%, localhost, IP)
+Das Script fragt dann nach:
+- SSH Host
+- SSH Port (Standard: 22)
+- SSH Password
 
-## Beispiel
+## Ablauf
+
+### Schritt 1: DB-Credentials extrahieren
+- Verbindet per SSH zum Server
+- Lädt PHP-Script zum Server
+- Liest Credentials aus `xtreammasters.so` Extension
+- Gibt DB-Host, Port, User, Pass und Database-Name aus
+
+### Schritt 2: User-Daten eingeben
+- **Username:** fest `masterxtream`
+- **Password:** Freie Eingabe (ohne Echo)
+- **Zugriffs-Level:**
+  - `1` - GRANT ALL PRIVILEGES (voller Admin)
+  - `2` - SELECT, INSERT, UPDATE, DELETE (Standard)
+  - `3` - SELECT only (Nur Lesen)
+- **Host-Zugriff:**
+  - `%` - Von überall (empfohlen)
+  - `localhost` - Nur lokal
+  - Spezifische IP
+
+### Schritt 3: MySQL User erstellen
+- Löscht alte User-Einträge
+- Erstellt neuen User
+- Vergibt Berechtigungen
+- Testet Verbindung
+- Zeigt alle Grants an
+
+## Sicherheitshinweise
+
+⚠️ **Wichtig:**
+- Verwendet SSH-Root-Zugang
+- Passwörter werden nicht im Klartext gespeichert
+- Temporäre PHP-Dateien werden nach Ausführung gelöscht
+- Nutzt sichere SSH-Verbindungen mit Timeout
+
+## Requirements
+
+- Python 3.6+
+- paramiko
+- SSH-Root-Zugang zum XtreamUI Server
+- XtreamMasters Extension installiert auf dem Server
+
+## Fehlerbehebung
+
+### "paramiko nicht installiert"
+```bash
+pip install paramiko
+```
+
+### "PHP binary nicht gefunden"
+Der Server muss XtreamUI/XtreamCodes mit PHP unter `/home/x_m/bin/php/bin/php` installiert haben.
+
+### "SSH Authentifizierung fehlgeschlagen"
+- Prüfe SSH-Host, Port und Passwort
+- Stelle sicher, dass Root-Login erlaubt ist
+
+## Beispiel-Output
 
 ```
+============================================================
 XtreamMasters Database User Manager
-====================================
+============================================================
 
-SSH Host [212.237.231.243]: 212.237.231.243
-SSH User [system_admin]: system_admin
-SSH Password [erundsie]: erundsie
+✓ Parameter von Kommandozeile:
+  Host: 89.105.194.222
+  Port: 22
 
 ============================================================
 SCHRITT 1: Extrahiere Datenbank-Credentials
 ============================================================
+Verbinde zu 89.105.194.222:22...
+Führe PHP-Script aus...
 ✓ Credentials gefunden:
-  Host: 117.55.203.215:7999
-  User: xtream_masters_user_3
-  Database: xtreammasters
+  Host: localhost:3306
+  User: user_iptvpro
+  Database: xtream_iptvpro
 
 ============================================================
 SCHRITT 2: Neue User-Daten eingeben
 ============================================================
-Username: myadmin
-Password: securepass123
+Username: masterxtream (fest)
+Password: 
 
 Zugriffs-Level:
 1) GRANT ALL PRIVILEGES (voller Admin-Zugriff)
@@ -79,94 +141,39 @@ Wähle (1-3) [Standard: 1]: 1
 ============================================================
 SCHRITT 3: Erstelle MySQL User
 ============================================================
+Führe MySQL User-Erstellung aus...
 ✓ Verbunden mit Datenbank
 ✓ Alte User-Einträge gelöscht
-✓ User erstellt: myadmin@%
+✓ User erstellt: masterxtream@%
 ✓ Rechte vergeben
 ✓ Privileges aktualisiert
 
 === Berechtigungen ===
-GRANT ALL PRIVILEGES ON *.* TO `myadmin`@`%` WITH GRANT OPTION
+GRANT ALL PRIVILEGES ON *.* TO 'masterxtream'@'%' WITH GRANT OPTION
 
 === Teste neue Verbindung ===
 ✓✓✓ VERBINDUNG ERFOLGREICH! ✓✓✓
-Host: 117.55.203.215 via TCP/IP
-Server: 5.5.5-10.6.22-MariaDB-ubu2204
+Host: localhost via TCP/IP
+Server: 10.4.32-MariaDB
 
 ============================================================
 ZUSAMMENFASSUNG
 ============================================================
-✓✓✓ USER ERFOLGREICH ERSTELLT! ✓✓✓
+✓ User erfolgreich erstellt!
 
-Username: myadmin
-Password: securepass123
-Host: %
-
-Connection String:
-mysql -h 117.55.203.215 -P 7999 -u myadmin -psecurepass123 xtreammasters
+Verbindungs-Details:
+  Host:     localhost
+  Port:     3306
+  User:     masterxtream
+  Password: ********
+  Database: xtream_iptvpro
+  Zugriff:  %
 ```
 
-## Wie es funktioniert
+## Lizenz
 
-1. **Credential-Extraktion**:
-   - Verbindet per SSH zum XtreamMasters Server
-   - Lädt xtreammasters.so PHP Extension
-   - Nutzt PHP Reflection API um private Methode `aeba41ad0a76b7698b828f34f6be6c10()` aufzurufen
-   - Diese Methode gibt ein Array mit [Host, Port, User, Password, Database] zurück
+Für private und kommerzielle Nutzung.
 
-2. **User-Erstellung**:
-   - Löscht existierende User-Einträge (falls vorhanden)
-   - Erstellt neuen MySQL User mit gewählten Credentials
-   - Vergibt die gewählten Berechtigungen
-   - Flushed Privileges
-   - Testet die neue Verbindung
+## Support
 
-3. **Sicherheit**:
-   - Alle temporären PHP-Dateien werden nach Ausführung gelöscht
-   - SSH-Verbindung wird nach Nutzung geschlossen
-   - Keine Credentials werden gespeichert
-
-## Zugriffs-Levels
-
-### Level 1: GRANT ALL PRIVILEGES
-```sql
-GRANT ALL PRIVILEGES ON *.* TO 'user'@'host' WITH GRANT OPTION
-```
-- Voller Admin-Zugriff
-- Kann andere User erstellen
-- Kann alle Datenbanken verwalten
-
-### Level 2: Standard-Zugriff
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON *.* TO 'user'@'host'
-```
-- Standard CRUD-Operationen
-- Keine DDL (CREATE/DROP TABLE)
-- Keine User-Verwaltung
-
-### Level 3: Read-Only
-```sql
-GRANT SELECT ON *.* TO 'user'@'host'
-```
-- Nur Lesen
-- Keine Änderungen möglich
-- Sicher für Reporting/Monitoring
-
-## Troubleshooting
-
-**Problem**: "Extension class not found"
-- Lösung: Prüfe ob xtreammasters.so existiert unter `/home/x_m/bin/php/lib/php/extensions/`
-
-**Problem**: "Access denied for user"
-- Lösung: Prüfe SSH-Credentials und ob Extension-Zugriff funktioniert
-
-**Problem**: "Host is not allowed to connect"
-- Lösung: Nutze Host '%' für Zugriff von überall
-
-## License
-
-MIT License - Free to use and modify
-
-## Author
-
-Created for XtreamMasters/XUI Database Management
+Bei Fragen oder Problemen bitte ein Issue erstellen.

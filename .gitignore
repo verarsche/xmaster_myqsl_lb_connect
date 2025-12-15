@@ -1,6 +1,7 @@
 # Credentials und sensitive Daten
 *.txt
 !README.txt
+!requirements.txt
 
 # Python
 __pycache__/

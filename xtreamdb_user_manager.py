@@ -2,14 +2,24 @@
 """
 XtreamMasters Database User Manager
 Findet automatisch die Datenbank-Credentials und erstellt neue Admin-User
+
+Usage: python xtreamdb_user_manager.py <SSH_HOST> <SSH_PORT> <SSH_PASSWORD>
+Beispiel: python xtreamdb_user_manager.py 89.105.194.222 22 xKHcjijwWkfsKy
 """
 
-import subprocess
 import os
 import sys
-import paramiko
+import getpass
 
-def extract_db_credentials(ssh_host, ssh_user, ssh_pass):
+try:
+    import paramiko
+except ImportError:
+    print("❌ Fehler: paramiko nicht installiert")
+    print("Installation: pip install paramiko")
+    sys.exit(1)
+
+
+def extract_db_credentials(ssh_host, ssh_port, ssh_user, ssh_pass):
     """
     Extrahiert Datenbank-Credentials aus xtreammasters.so Extension
     """
@@ -56,11 +66,18 @@ try {
 '''
     
     try:
+        print(f"Verbinde zu {ssh_host}:{ssh_port}...")
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(ssh_host, username=ssh_user, password=ssh_pass)
+        ssh.connect(ssh_host, port=ssh_port, username=ssh_user, password=ssh_pass, timeout=10)
         
-        # Upload PHP script
+        # Prüfe ob PHP existiert
+        stdin, stdout, stderr = ssh.exec_command('test -f /home/x_m/bin/php/bin/php && echo OK')
+        if stdout.read().decode().strip() != 'OK':
+            print("✗ PHP binary nicht gefunden unter /home/x_m/bin/php/bin/php")
+            ssh.close()
+            return None
+        
         sftp = ssh.open_sftp()
         remote_php = '/tmp/extract_creds.php'
         temp_php = 'temp_extract.php'
@@ -80,7 +97,9 @@ try {
         ssh.exec_command(f'rm -f {remote_php}')
         ssh.close()
         
-        # Parse output
+        if error:
+            print(f"⚠️ Fehler-Output: {error}")
+        
         credentials = {}
         for line in output.strip().split('\n'):
             if '=' in line:
@@ -111,12 +130,11 @@ def get_user_input():
     print("SCHRITT 2: Neue User-Daten eingeben")
     print("=" * 60)
     
-    username = input("Username: ").strip()
-    if not username:
-        print("✗ Username darf nicht leer sein")
-        sys.exit(1)
+    # Username ist fest
+    username = "masterxtream"
+    print(f"Username: {username} (fest)")
     
-    password = input("Password: ").strip()
+    password = getpass.getpass("Password: ").strip()
     if not password:
         print("✗ Password darf nicht leer sein")
         sys.exit(1)
@@ -160,7 +178,7 @@ def get_user_input():
     }
 
 
-def create_mysql_user(ssh_host, ssh_user, ssh_pass, db_creds, user_data):
+def create_mysql_user(ssh_host, ssh_port, ssh_user, ssh_pass, db_creds, user_data):
     """
     Erstellt neuen MySQL User
     """
@@ -168,10 +186,14 @@ def create_mysql_user(ssh_host, ssh_user, ssh_pass, db_creds, user_data):
     print("SCHRITT 3: Erstelle MySQL User")
     print("=" * 60)
     
+    # Escape Sonderzeichen für PHP
+    db_pass_escaped = db_creds["DB_PASS"].replace("'", "\\'")
+    new_pass_escaped = user_data["password"].replace("'", "\\'")
+    
     php_code = f'''<?php
 $link = mysqli_init();
 if (!mysqli_real_connect($link, '{db_creds["DB_HOST"]}', '{db_creds["DB_USER"]}', 
-                          '{db_creds["DB_PASS"]}', '{db_creds["DB_NAME"]}', 
+                          '{db_pass_escaped}', '{db_creds["DB_NAME"]}', 
                           {db_creds["DB_PORT"]})) {{
     die("ERROR: " . mysqli_connect_error() . "\\n");
 }}
@@ -179,7 +201,7 @@ if (!mysqli_real_connect($link, '{db_creds["DB_HOST"]}', '{db_creds["DB_USER"]}'
 echo "✓ Verbunden mit Datenbank\\n";
 
 $new_user = '{user_data["username"]}';
-$new_pass = '{user_data["password"]}';
+$new_pass = '{new_pass_escaped}';
 $new_host = '{user_data["host"]}';
 
 // Drop existing user
@@ -257,20 +279,19 @@ mysqli_close($link);
         sftp.close()
         os.remove(temp_php)
         
-        # Execute
+        print("Führe MySQL User-Erstellung aus...")
         stdin, stdout, stderr = ssh.exec_command(f'/home/x_m/bin/php/bin/php {remote_php}')
         output = stdout.read().decode('utf-8')
+        error = stderr.read().decode('utf-8')
         
-        # Cleanup
         ssh.exec_command(f'rm -f {remote_php}')
         ssh.close()
         
         print(output)
+        if error:
+            print(f"Fehler: {error}")
         
-        if "✓✓✓ VERBINDUNG ERFOLGREICH!" in output:
-            return True
-        else:
-            return False
+        return "✓✓✓ VERBINDUNG ERFOLGREICH!" in output
             
     except Exception as e:
         print(f"✗ Fehler: {e}")
@@ -281,24 +302,49 @@ def main():
     print("=" * 60)
     print("XtreamMasters Database User Manager")
     print("=" * 60)
-    print()
     
-    # SSH Credentials
-    SSH_HOST = input("SSH Host [212.237.231.243]: ").strip() or "212.237.231.243"
-    SSH_USER = input("SSH User [system_admin]: ").strip() or "system_admin"
-    SSH_PASS = input("SSH Password [erundsie]: ").strip() or "erundsie"
+    # Kommandozeilen-Argumente prüfen
+    if len(sys.argv) == 4:
+        SSH_HOST = sys.argv[1]
+        SSH_PORT = int(sys.argv[2])
+        SSH_PASS = sys.argv[3]
+        print(f"\n✓ Parameter von Kommandozeile:")
+        print(f"  Host: {SSH_HOST}")
+        print(f"  Port: {SSH_PORT}")
+    else:
+        print("\nUsage: python xtreamdb_user_manager.py <HOST> <PORT> <PASSWORD>")
+        print("Beispiel: python xtreamdb_user_manager.py 89.105.194.222 22 xKHcjijwWkfsKy")
+        print("\nOder manuelle Eingabe:")
+        SSH_HOST = input("\nSSH Host: ").strip()
+        if not SSH_HOST:
+            print("✗ Host darf nicht leer sein")
+            sys.exit(1)
+        
+        SSH_PORT = input("SSH Port [22]: ").strip() or "22"
+        try:
+            SSH_PORT = int(SSH_PORT)
+        except ValueError:
+            print("✗ Port muss eine Zahl sein")
+            sys.exit(1)
+        
+        SSH_PASS = getpass.getpass("SSH Password: ").strip()
+        if not SSH_PASS:
+            print("✗ Password darf nicht leer sein")
+            sys.exit(1)
+    
+    SSH_USER = "root"  # Immer root
     
     # Schritt 1: DB Credentials extrahieren
-    db_creds = extract_db_credentials(SSH_HOST, SSH_USER, SSH_PASS)
+    db_creds = extract_db_credentials(SSH_HOST, SSH_PORT, SSH_USER, SSH_PASS)
     if not db_creds:
-        print("\n✗ Fehler beim Extrahieren der Credentials")
+        print("\n✗ Konnte Datenbank-Credentials nicht extrahieren")
         sys.exit(1)
     
     # Schritt 2: User-Daten eingeben
     user_data = get_user_input()
     
     # Schritt 3: User erstellen
-    success = create_mysql_user(SSH_HOST, SSH_USER, SSH_PASS, db_creds, user_data)
+    success = create_mysql_user(SSH_HOST, SSH_PORT, SSH_USER, SSH_PASS, db_creds, user_data)
     
     # Zusammenfassung
     print("\n" + "=" * 60)
@@ -306,15 +352,16 @@ def main():
     print("=" * 60)
     
     if success:
-        print(f"✓✓✓ USER ERFOLGREICH ERSTELLT! ✓✓✓")
-        print(f"\nUsername: {user_data['username']}")
-        print(f"Password: {user_data['password']}")
-        print(f"Host: {user_data['host']}")
-        print(f"\nConnection String:")
-        print(f"mysql -h {db_creds['DB_HOST']} -P {db_creds['DB_PORT']} " +
-              f"-u {user_data['username']} -p{user_data['password']} {db_creds['DB_NAME']}")
+        print("✓ User erfolgreich erstellt!")
+        print(f"\nVerbindungs-Details:")
+        print(f"  Host:     {db_creds['DB_HOST']}")
+        print(f"  Port:     {db_creds['DB_PORT']}")
+        print(f"  User:     {user_data['username']}")
+        print(f"  Password: {user_data['password']}")
+        print(f"  Database: {db_creds['DB_NAME']}")
+        print(f"  Zugriff:  {user_data['host']}")
     else:
-        print("✗ Fehler beim Erstellen des Users")
+        print("✗ User-Erstellung fehlgeschlagen")
         sys.exit(1)
 
 
