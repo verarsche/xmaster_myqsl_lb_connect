@@ -29,7 +29,7 @@ python xtreamdb_user_manager.py <SSH_HOST> <SSH_PORT> <SSH_PASSWORD>
 
 **Beispiel:**
 ```bash
-python xtreamdb_user_manager.py 89.105.194.222 22 xKHcjijwWkfsKy
+python xtreamdb_user_manager.py your-server-ip.com 22 your-ssh-password
 ```
 
 ### Option 2: Interaktiv
@@ -107,18 +107,18 @@ XtreamMasters Database User Manager
 ============================================================
 
 ✓ Parameter von Kommandozeile:
-  Host: 89.105.194.222
+  Host: your-server-ip.com
   Port: 22
 
 ============================================================
 SCHRITT 1: Extrahiere Datenbank-Credentials
 ============================================================
-Verbinde zu 89.105.194.222:22...
+Verbinde zu your-server-ip.com:22...
 Führe PHP-Script aus...
 ✓ Credentials gefunden:
   Host: localhost:3306
-  User: user_iptvpro
-  Database: xtream_iptvpro
+  User: db_username
+  Database: xtream_database
 
 ============================================================
 SCHRITT 2: Neue User-Daten eingeben
@@ -166,7 +166,7 @@ Verbindungs-Details:
   Port:     3306
   User:     masterxtream
   Password: ********
-  Database: xtream_iptvpro
+  Database: xtream_database
   Zugriff:  %
 ```
 
