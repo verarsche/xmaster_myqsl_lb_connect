@@ -2,6 +2,110 @@
 
 Automatisches Tool zum Extrahieren von Datenbank-Credentials und Erstellen von MySQL-Admin-Usern auf XtreamUI/XtreamCodes Servern.
 
+---
+
+## 🎵 musicgen — Video-to-Music-Genre Toolkit
+
+Extract audio from any video file and transform it into **rock**, **rap**, or **metal** style — all locally, no cloud required.
+
+### Quick start
+
+```bash
+# 1. Install system dependency
+sudo apt install ffmpeg          # Ubuntu/Debian
+# brew install ffmpeg            # macOS
+
+# 2. Install Python dependencies
+pip install -r requirements_music.txt
+
+# 3. Extract audio from your video
+python -m musicgen extract-audio myvideo.mp4 -o audio.wav
+
+# 4. (Optional) Separate vocals from instrumental
+python -m musicgen separate audio.wav \
+    --vocals     vocals.wav \
+    --instrumental instrumental.wav
+
+# 5. Generate genre-styled versions
+python -m musicgen genre audio.wav --style rock  -o rock_out.wav
+python -m musicgen genre audio.wav --style rap   -o rap_out.wav
+python -m musicgen genre audio.wav --style metal -o metal_out.wav
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `extract-audio <video> -o <out.wav>` | Extract audio track from a video file |
+| `separate <audio> --vocals V --instrumental I` | Split into vocals + instrumental |
+| `genre <audio> --style rock\|rap\|metal -o <out.wav>` | Apply genre processing |
+
+#### `extract-audio` options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--sample-rate` | 44100 | Output sample rate in Hz |
+| `--channels` | 2 | 1 = mono, 2 = stereo |
+
+#### `separate` options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--backend` | `auto` | `auto` / `demucs` / `builtin` |
+
+The `auto` backend tries **demucs** first (better quality) and falls back to the built-in spectral mid/side separator.  
+Install demucs for best results: `pip install demucs`
+
+### Genre processing pipeline
+
+Each genre applies a deterministic DSP chain to the input audio, plus a synthetic drum layer:
+
+| Stage | Rock | Rap | Metal |
+|-------|------|-----|-------|
+| High-pass filter | 80 Hz | — | 100 Hz |
+| Distortion | soft-clip (tanh, drive=4) | — | hard-clip (drive=10) |
+| EQ boost | +6 dB @ 1 kHz | +8 dB sub-bass @ 80 Hz | +8 dB presence @ 3 kHz |
+| Compressor | 4:1, -18 dBFS | 6:1, -20 dBFS | 10:1, -24 dBFS |
+| Reverb | — | 40 ms room | 60 ms plate |
+| Drum layer | 120 BPM rock beat | 90 BPM boom-bap | 180 BPM blast-beat |
+
+### Integrating an AI model
+
+The genre pipeline exposes an `_ai_hook()` function in `musicgen/genre.py`.  
+Replace it with a call to any model (e.g. MusicGen, Stable Audio) to upgrade quality:
+
+```python
+# musicgen/genre.py — _ai_hook
+from audiocraft.models import MusicGen
+
+def _ai_hook(samples, rate, style):
+    model = MusicGen.get_pretrained("facebook/musicgen-melody")
+    out = model.generate_with_chroma(
+        descriptions=[{"rock": "electric guitar rock", "rap": "hip hop beat", "metal": "heavy metal"}[style]],
+        melody_wavs=torch.tensor(samples).unsqueeze(0),
+        melody_sample_rate=rate,
+    )
+    return out[0].numpy()
+```
+
+### Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `numpy` | Signal arrays |
+| `scipy` | DSP filters (Butterworth, peaking EQ) |
+| `ffmpeg` *(system)* | Video demux + format conversion |
+| `demucs` *(optional)* | High-quality vocal separation |
+
+### Running the tests
+
+```bash
+pip install pytest numpy scipy
+python -m pytest tests/test_music_tools.py -v
+```
+
+---
+
 ## Features
 
 - ✅ Automatische Extraktion der DB-Credentials aus `xtreammasters.so` Extension
