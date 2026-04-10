@@ -218,8 +218,10 @@ class TestGenre:
             samples, _ = read_wav(dst)
             outputs[style] = samples
 
+        def rms(s):
+            return float(np.sqrt(np.mean(s ** 2)))
+
         # At least two of three outputs should differ measurably
-        rms = lambda s: float(np.sqrt(np.mean(s ** 2)))
         values = [rms(outputs[s]) for s in ("rock", "rap", "metal")]
         # They should not all be identical
         assert len(set(round(v, 5) for v in values)) > 1, (

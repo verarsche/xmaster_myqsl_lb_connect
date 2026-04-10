@@ -81,7 +81,8 @@ def _separate_demucs(
     instrumental_out: str,
 ) -> Tuple[Path, Path]:
     """Run demucs CLI and copy the stems to the requested output paths."""
-    import tempfile, shutil
+    import tempfile
+    import shutil
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="musicgen_demucs_"))
     try:

@@ -83,9 +83,9 @@ def write_wav(path: str | Path, samples: np.ndarray, rate: int) -> None:
     Write float64 samples (channels, frames) to a 16-bit PCM WAV file.
     Clipping is applied before conversion.
     """
-    # Convert to mono if needed by averaging channels
+    # Transpose from (channels, frames) to (frames, channels) for wave output
     if samples.ndim == 2:
-        out = samples.T  # (frames, channels)
+        out = samples.T
     else:
         out = samples.reshape(-1, 1)
 

@@ -319,9 +319,22 @@ def _beat_grid(
     subdivision: int = 16,
 ) -> np.ndarray:
     """
-    Place *hit* at positions indicated by *pattern* (16-step or 8-step grid).
-    *pattern* length must equal *subdivision*.
+    Place *hit* at positions indicated by *pattern* (one step per beat subdivision).
+
+    Parameters
+    ----------
+    pattern      : Boolean list whose length **must equal** *subdivision*.
+                   Each ``True`` entry triggers one drum hit at that grid step.
+    hit          : 1-D array containing the synthesised transient waveform.
+    total_frames : Total output length in samples.
+    rate         : Sample rate in Hz.
+    bpm          : Tempo in beats per minute.
+    subdivision  : Number of equal grid steps per bar (default 16 = sixteenth notes).
     """
+    if len(pattern) != subdivision:
+        raise ValueError(
+            f"pattern length ({len(pattern)}) must equal subdivision ({subdivision})"
+        )
     beat_frames   = int(rate * 60.0 / bpm)
     step_frames   = beat_frames // (subdivision // 4)
     grid          = np.zeros(total_frames)
